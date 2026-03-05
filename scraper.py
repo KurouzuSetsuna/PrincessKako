@@ -69,18 +69,28 @@ def parse_year_month_from_url(url: str) -> tuple[int, int]:
     return today.year, today.month
 
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "ja,en;q=0.9",
+}
+
+
 def fetch_monthly_links() -> list[dict]:
     """メインページから月別ページのリンク一覧を取得する。"""
-    resp = requests.get(SCHEDULE_INDEX, timeout=15)
+    resp = requests.get(SCHEDULE_INDEX, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     resp.encoding = "utf-8"
     soup = BeautifulSoup(resp.text, "lxml")
 
     links = []
-    # 宮内庁サイトの月別リンクを探す
+    # 宮内庁サイトの月別リンクを探す（index_r0612.html 形式）
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if re.search(r"index_r\d{4}\.html", href):
+        if re.search(r"index_r\d{2,4}\.html", href):
             # 相対URLを絶対URLに変換
             if href.startswith("http"):
                 full_url = href
@@ -117,7 +127,7 @@ def fetch_monthly_schedule(url: str, year: int, month: int) -> list[dict]:
     月別ページから日程一覧を取得する。
     Returns: [{"date": "2024-12-01", "content": "...", "location": "..."}]
     """
-    resp = requests.get(url, timeout=15)
+    resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     resp.encoding = "utf-8"
     soup = BeautifulSoup(resp.text, "lxml")
@@ -275,6 +285,7 @@ def scrape(force: bool = False) -> dict[str, list[dict]]:
 
     if not monthly_links:
         print("月別リンクが見つかりませんでした。サイト構造が変わった可能性があります。")
+        save_data(existing)  # JSONが存在しない場合に備えて空でも保存する
         return existing
 
     print(f"月別ページ数: {len(monthly_links)}")
