@@ -144,8 +144,15 @@ def _parse_location_from_content(content: str) -> tuple[str, str]:
 def fetch_monthly_schedule(url: str, year: int, month: int) -> list[dict]:
     """
     月別ページから佳子内親王殿下の日程一覧を取得する。
-    ページ構造: <h2>令和X年Y月Z日（曜）</h2> の下に
-    対象者と内容のテーブルが続く形式。
+
+    ページ構造:
+      <tbody data-date="令和X年Y月Z日（曜）">
+        <tr>
+          <th scope="row">佳子内親王殿下</th>
+          <td>行事内容（場所／都道府県）</td>
+        </tr>
+      </tbody>
+
     Returns: [{"date": "2024-12-01", "content": "...", "location": "..."}]
     """
     resp = requests.get(url, headers=HEADERS, timeout=15)
@@ -154,49 +161,42 @@ def fetch_monthly_schedule(url: str, year: int, month: int) -> list[dict]:
     soup = BeautifulSoup(resp.text, "lxml")
 
     events = []
-    current_date = None
 
-    # ページ内の全要素を順に走査する
-    for tag in soup.find_all(["h2", "h3", "tr"]):
-        # ── 日付見出し（h2/h3）──
-        if tag.name in ("h2", "h3"):
-            text = tag.get_text(strip=True)
-            # 「令和X年Y月Z日（曜）」を西暦に変換
-            m = re.search(r"(\d+)月(\d+)日", text)
-            if m:
-                try:
-                    current_date = date(year, int(m.group(1)), int(m.group(2)))
-                except ValueError:
-                    current_date = None
+    # data-date属性付きのtbodyを全て取得
+    for tbody in soup.find_all("tbody", attrs={"data-date": True}):
+        date_str = tbody["data-date"]
+        m = re.search(r"(\d+)月(\d+)日", date_str)
+        if not m:
+            continue
+        try:
+            current_date = date(year, int(m.group(1)), int(m.group(2)))
+        except ValueError:
             continue
 
-        # ── テーブル行（tr）──
-        if current_date is None:
-            continue
+        for tr in tbody.find_all("tr"):
+            # th[scope=row] が対象者名
+            th = tr.find("th", attrs={"scope": "row"})
+            td = tr.find("td")
+            if not th or not td:
+                continue
 
-        cells = tag.find_all(["td", "th"])
-        if len(cells) < 2:
-            continue
+            person = th.get_text(strip=True)
+            if "佳子内親王" not in person:
+                continue
 
-        cell_texts = [c.get_text(separator="", strip=True) for c in cells]
+            raw_content = td.get_text(separator="", strip=True)
+            # 冒頭に「佳子内親王殿下」が重複している場合は除去
+            raw_content = re.sub(r"^佳子内親王殿下\s*", "", raw_content)
+            content, location = _parse_location_from_content(raw_content)
 
-        # 対象者列に「佳子内親王」が含まれる行のみ処理
-        target = cell_texts[0]
-        if "佳子内親王" not in target:
-            continue
+            if content:
+                events.append({
+                    "date": current_date.isoformat(),
+                    "content": content,
+                    "location": location,
+                })
 
-        # 内容列（2列目以降を結合）
-        raw_content = "　".join(t for t in cell_texts[1:] if t)
-        content, location = _parse_location_from_content(raw_content)
-
-        if content:
-            events.append({
-                "date": current_date.isoformat(),
-                "content": content,
-                "location": location,
-            })
-
-    # h2+table構造で取れなかった場合のフォールバック
+    # フォールバック（古い形式のページ対応）
     if not events:
         events = _parse_dl_structure(soup, year, month)
     if not events:
