@@ -54,15 +54,12 @@ def parse_japanese_date(date_str: str, current_year: int, current_month: int) ->
 
 def parse_year_month_from_url(url: str) -> tuple[int, int]:
     """
-    URLから年月を推測する。例: index_r0612.html -> 令和6年12月
-    フォーマット: index_r{年2桁}{月2桁}.html
+    URLから年月を取得する。例: .../202602/index.html -> 2026年2月
+    フォーマット: .../YYYYMM/index.html
     """
-    m = re.search(r"index_r(\d{2})(\d{2})\.html", url)
+    m = re.search(r"/(\d{4})(\d{2})/index\.html", url)
     if m:
-        reiwa_year = int(m.group(1))
-        month = int(m.group(2))
-        year = era_to_year("令和", reiwa_year)
-        return year, month
+        return int(m.group(1)), int(m.group(2))
 
     # fallback: 現在の日付
     today = date.today()
@@ -87,10 +84,10 @@ def fetch_monthly_links() -> list[dict]:
     soup = BeautifulSoup(resp.text, "lxml")
 
     links = []
-    # 宮内庁サイトの月別リンクを探す（index_r0612.html 形式）
+    # 宮内庁サイトの月別リンクを探す（例: 202602/index.html 形式）
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if re.search(r"index_r\d{2,4}\.html", href):
+        if re.search(r"\d{6}/index\.html", href):
             # 相対URLを絶対URLに変換
             if href.startswith("http"):
                 full_url = href
