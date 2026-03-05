@@ -1,4 +1,4 @@
-name: KakoCal - スケジュール自動更新
+name: PrincessKako - スケジュール自動更新
 
 on:
   # AM5時(JST) = 20:00 UTC (前日)
