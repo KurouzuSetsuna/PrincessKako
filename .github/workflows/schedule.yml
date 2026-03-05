@@ -1,0 +1,55 @@
+name: KakoCal - スケジュール自動更新
+
+on:
+  # AM5時(JST) = 20:00 UTC (前日)
+  # 13時(JST)  = 04:00 UTC
+  schedule:
+    - cron: "0 20 * * *"   # 毎日 AM5:00 JST
+    - cron: "0 4 * * *"    # 毎日 13:00 JST
+
+  # 手動実行も可能
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "全月を再取得する (--force)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # index.html等をコミットするために必要
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python のセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 依存ライブラリをインストール
+        run: pip install -r requirements.txt
+
+      - name: スクレイピング & ファイル生成
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            python main.py --force
+          else
+            python main.py
+          fi
+
+      - name: 生成ファイルをコミット & プッシュ
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: ご日程を自動更新 [skip ci]"
+          file_pattern: "kako_schedule.json kako_schedule.ics index.html"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
