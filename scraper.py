@@ -119,9 +119,33 @@ def fetch_monthly_links() -> list[dict]:
     return unique
 
 
+def _parse_location_from_content(content: str) -> tuple[str, str]:
+    """
+    「行事名（場所名／都道府県）」から行事名と場所を分離する。
+    場所が見つからない場合は location="" を返す。
+    """
+    # 末尾の（場所／都道府県）パターン
+    m = re.search(r"（([^）]+／[^）]+)）\s*$", content)
+    if m:
+        location = m.group(1)
+        content = content[: m.start()].strip()
+        return content, location
+
+    # 「於：場所」パターン
+    m = re.search(r"於[：:]\s*(.+)", content)
+    if m:
+        location = m.group(1).strip()
+        content = re.sub(r"於[：:]\s*.+", "", content).strip()
+        return content, location
+
+    return content, ""
+
+
 def fetch_monthly_schedule(url: str, year: int, month: int) -> list[dict]:
     """
-    月別ページから日程一覧を取得する。
+    月別ページから佳子内親王殿下の日程一覧を取得する。
+    ページ構造: <h2>令和X年Y月Z日（曜）</h2> の下に
+    対象者と内容のテーブルが続く形式。
     Returns: [{"date": "2024-12-01", "content": "...", "location": "..."}]
     """
     resp = requests.get(url, headers=HEADERS, timeout=15)
@@ -130,62 +154,51 @@ def fetch_monthly_schedule(url: str, year: int, month: int) -> list[dict]:
     soup = BeautifulSoup(resp.text, "lxml")
 
     events = []
+    current_date = None
 
-    # 宮内庁の日程ページの構造を解析
-    # テーブル形式の場合
-    tables = soup.find_all("table")
-    for table in tables:
-        rows = table.find_all("tr")
-        current_date = None
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if not cells:
-                continue
+    # ページ内の全要素を順に走査する
+    for tag in soup.find_all(["h2", "h3", "tr"]):
+        # ── 日付見出し（h2/h3）──
+        if tag.name in ("h2", "h3"):
+            text = tag.get_text(strip=True)
+            # 「令和X年Y月Z日（曜）」を西暦に変換
+            m = re.search(r"(\d+)月(\d+)日", text)
+            if m:
+                try:
+                    current_date = date(year, int(m.group(1)), int(m.group(2)))
+                except ValueError:
+                    current_date = None
+            continue
 
-            cell_texts = [c.get_text(separator=" ", strip=True) for c in cells]
+        # ── テーブル行（tr）──
+        if current_date is None:
+            continue
 
-            # 日付セルを探す（「12月1日」「1日」などのパターン）
-            date_cell = None
-            for i, text in enumerate(cell_texts):
-                if re.search(r"\d+日", text):
-                    date_cell = i
-                    break
+        cells = tag.find_all(["td", "th"])
+        if len(cells) < 2:
+            continue
 
-            if date_cell is not None:
-                parsed = parse_japanese_date(cell_texts[date_cell], year, month)
-                if parsed:
-                    current_date = parsed
+        cell_texts = [c.get_text(separator="", strip=True) for c in cells]
 
-            if current_date is None:
-                continue
+        # 対象者列に「佳子内親王」が含まれる行のみ処理
+        target = cell_texts[0]
+        if "佳子内親王" not in target:
+            continue
 
-            # 内容と場所を取得
-            content_parts = []
-            location = ""
-            for i, text in enumerate(cell_texts):
-                if i == date_cell:
-                    continue
-                # 場所らしきテキスト（「於：〇〇」など）
-                loc_m = re.search(r"於[：:]\s*(.+)", text)
-                if loc_m:
-                    location = loc_m.group(1).strip()
-                    text = re.sub(r"於[：:]\s*.+", "", text).strip()
-                if text:
-                    content_parts.append(text)
+        # 内容列（2列目以降を結合）
+        raw_content = "　".join(t for t in cell_texts[1:] if t)
+        content, location = _parse_location_from_content(raw_content)
 
-            content = " ".join(content_parts).strip()
-            if content:
-                events.append({
-                    "date": current_date.isoformat(),
-                    "content": content,
-                    "location": location,
-                })
+        if content:
+            events.append({
+                "date": current_date.isoformat(),
+                "content": content,
+                "location": location,
+            })
 
-    # テーブルが見つからない場合、dl/dt/dd 構造を試みる
+    # h2+table構造で取れなかった場合のフォールバック
     if not events:
         events = _parse_dl_structure(soup, year, month)
-
-    # それでも見つからない場合、段落テキストから解析
     if not events:
         events = _parse_text_structure(soup, year, month)
 
