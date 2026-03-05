@@ -81,9 +81,9 @@ def generate_html(data: dict[str, list[dict]]) -> None:
     monthly = collect_events_by_month(data)
     updated_at = datetime.now(timezone.utc).strftime("%Y年%m月%d日 %H:%M UTC")
 
-    # 月別セクションのHTML生成
+    # 月別セクションのHTML生成（新しい月を上に表示）
     sections_html = ""
-    for month_key, events in monthly.items():
+    for month_key, events in reversed(list(monthly.items())):
         year_str, month_str = month_key.split("-")
         year, month = int(year_str), int(month_str)
         era = _era_label(year, month)
@@ -118,9 +118,9 @@ def generate_html(data: dict[str, list[dict]]) -> None:
       </div>
     </section>"""
 
-    # ナビゲーション
+    # ナビゲーション（最新の月を左に表示）
     nav_items = ""
-    for month_key in monthly.keys():
+    for month_key in reversed(list(monthly.keys())):
         year_str, month_str = month_key.split("-")
         year, month = int(year_str), int(month_str)
         era = _era_label(year, month)
