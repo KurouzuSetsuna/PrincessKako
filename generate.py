@@ -7,7 +7,7 @@ import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from ics import Calendar, Event
+from icalendar import Calendar, Event, vText
 
 DATA_FILE = Path("kako_schedule.json")
 ICS_FILE = Path("kako_schedule.ics")
@@ -24,21 +24,22 @@ def load_data() -> dict[str, list[dict]]:
 def generate_ics(data: dict[str, list[dict]]) -> None:
     """ICSカレンダーファイルを生成する。"""
     cal = Calendar()
-    cal.creator = "KakoCal"
+    cal.add("prodid", "-//KakoCal//JP")
+    cal.add("version", "2.0")
 
     for month_key, events in sorted(data.items()):
         for ev in events:
             e = Event()
-            e.name = ev["content"]
-            e.begin = ev["date"]
-            e.make_all_day()
+            e.add("summary", ev["content"])
+            e.add("dtstart", date.fromisoformat(ev["date"]))
+            e.add("dtend", date.fromisoformat(ev["date"]))
             if ev.get("location"):
-                e.location = ev["location"]
-            e.description = ev["content"]
-            cal.events.add(e)
+                e.add("location", vText(ev["location"]))
+            e.add("description", ev["content"])
+            cal.add_component(e)
 
-    with ICS_FILE.open("w", encoding="utf-8") as f:
-        f.writelines(cal)
+    with ICS_FILE.open("wb") as f:
+        f.write(cal.to_ical())
 
     print(f"ICSファイルを生成しました: {ICS_FILE}")
 
