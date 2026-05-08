@@ -7380,4 +7380,26 @@ DTEND;VALUE=DATE:20260401
 DESCRIPTION:宮内庁人事異動者ご会釈
 LOCATION:秋篠宮邸／東京都港区
 END:VEVENT
+BEGIN:VEVENT
+SUMMARY:「音の花束 vol.18 パラグアイ日本人移住90周年記
+ 念／パラグアイ独立215周年記念 パラグアイ・ハープ（
+ アルパ）デュオコンサート」ご覧
+DTSTART;VALUE=DATE:20260503
+DTEND;VALUE=DATE:20260503
+DESCRIPTION:「音の花束 vol.18 パラグアイ日本人移住90周年
+ 記念／パラグアイ独立215周年記念 パラグアイ・ハープ
+ （アルパ）デュオコンサート」ご覧
+LOCATION:東京芸術センター／東京都足立区
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:「セーブ・ザ・チルドレン チャリティディナー20
+ 26　-セーブ・ザ・チルドレン・ジャパン創立40年-」ご
+ 臨席及びセーブ・ザ・チルドレン活動概要展示ご覧
+DTSTART;VALUE=DATE:20260507
+DTEND;VALUE=DATE:20260507
+DESCRIPTION:「セーブ・ザ・チルドレン チャリティディナ
+ ー2026　-セーブ・ザ・チルドレン・ジャパン創立40年-」
+ ご臨席及びセーブ・ザ・チルドレン活動概要展示ご覧
+LOCATION:グランドハイアット東京／東京都港区
+END:VEVENT
 END:VCALENDAR
